@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PE Valuation Model</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f3;
+    --bg3: #ebebeb;
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --text3: #9a9a96;
+    --border: rgba(0,0,0,0.12);
+    --border2: rgba(0,0,0,0.22);
+    --blue: #185FA5;
+    --blue-light: #B5D4F4;
+    --teal: #5DCAA5;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg2: #272725;
+      --bg3: #323230;
+      --text: #f0efe8;
+      --text2: #a0a09a;
+      --text3: #6a6a66;
+      --border: rgba(255,255,255,0.10);
+      --border2: rgba(255,255,255,0.18);
+      --blue: #378ADD;
+      --blue-light: #0C447C;
+      --teal: #1D9E75;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 2rem;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .assumptions-card {
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .assumptions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px 24px;
+  }
+
+  .assumption-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .assumption-field label {
+    font-size: 12px;
+    color: var(--text2);
+  }
+
+  .assumption-field input[type="number"],
+  .assumption-field input[type="text"] {
+    background: var(--bg);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    width: 100%;
+    outline: none;
+  }
+
+  .assumption-field input:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(24,95,165,0.15);
+  }
+
+  .prefix-wrap {
+    position: relative;
+  }
+  .prefix-wrap .prefix {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: var(--text2);
+    pointer-events: none;
+  }
+  .prefix-wrap input { padding-left: 22px; }
+
+  .ctrl-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px 28px;
+    margin-bottom: 1.5rem;
+  }
+
+  .ctrl-row { display: flex; flex-direction: column; gap: 4px; }
+  .ctrl-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text2);
+  }
+  .ctrl-val { font-weight: 500; color: var(--text); }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border2);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--blue);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--blue);
+    cursor: pointer;
+    border: none;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0,1fr));
+    gap: 8px;
+    margin-bottom: 1.25rem;
+  }
+
+  .metric {
+    background: var(--bg2);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  .metric-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+  .metric-value { font-size: 16px; font-weight: 500; color: var(--text); }
+  .metric-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .metric.highlight .metric-value { color: var(--blue); }
+  .metric.good .metric-value { color: #3B6D11; }
+  .metric.warn .metric-value { color: #854F0B; }
+
+  @media (prefers-color-scheme: dark) {
+    .metric.good .metric-value { color: #97C459; }
+    .metric.warn .metric-value { color: #EF9F27; }
+  }
+
+  .tab-row {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 1rem;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .tab {
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--text2);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .tab.active {
+    color: var(--text);
+    border-bottom: 2px solid var(--blue);
+    font-weight: 500;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text2);
+    flex-wrap: wrap;
+  }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .ldot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 260px;
+  }
+
+  .heatmap-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 3px;
+    height: 28px;
+  }
+  .heatmap-axis {
+    font-size: 11px;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .notes {
+    margin-top: 1rem;
+    font-size: 13px;
+    color: var(--text2);
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .divider {
+    border: none;
+    border-top: 0.5px solid var(--border);
+    margin: 1.5rem 0;
+  }
+
+  .reset-btn {
+    font-size: 12px;
+    color: var(--text2);
+    background: none;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 4px 12px;
+    cursor: pointer;
+    float: right;
+    margin-top: -2px;
+  }
+  .reset-btn:hover { background: var(--bg3); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>PE valuation model</h1>
+  <p class="subtitle">5-year hold · no debt · NTM gross profit exit approach</p>
+
+  <div class="assumptions-card">
+    <div class="section-title">
+      Deal assumptions
+      <button class="reset-btn" onclick="resetAssumptions()">Reset to defaults</button>
+    </div>
+    <div class="assumptions-grid">
+      <div class="assumption-field">
+        <label>Company name</label>
+        <input type="text" id="companyName" value="Portfolio Co." oninput="update()">
+      </div>
+      <div class="assumption-field">
+        <label>Year 0 revenue</label>
+        <div class="prefix-wrap">
+          <span class="prefix">$</span>
+          <input type="number" id="y0rev" value="136" min="1" step="1" oninput="update()">
+        </div>
+      </div>
+      <div class="assumption-field">
+        <label>Revenue unit</label>
+        <select id="revUnit" onchange="update()" style="background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);padding:6px 10px;font-size:14px;font-weight:500;color:var(--text);width:100%;outline:none;">
+          <option value="1">Millions (M)</option>
+          <option value="1000">Billions (B)</option>
+        </select>
+      </div>
+      <div class="assumption-field">
+        <label>Initial investment</label>
+        <div class="prefix-wrap">
+          <span class="prefix">$</span>
+          <input type="number" id="investment" value="100" min="1" step="1" oninput="update()">
+        </div>
+      </div>
+      <div class="assumption-field">
+        <label>Ownership stake (%)</label>
+        <div class="prefix-wrap">
+          <span class="prefix">%</span>
+          <input type="number" id="stake" value="12.8" min="0.1" max="100" step="0.1" oninput="update()">
+        </div>
+      </div>
+      <div class="assumption-field">
+        <label>Hold period (years)</label>
+        <input type="number" id="holdYears" value="5" min="1" max="15" step="1" oninput="update()">
+      </div>
+    </div>
+  </div>
+
+  <div class="ctrl-grid">
+    <div class="ctrl-row">
+      <div class="ctrl-label"><span>Annual growth rate</span><span class="ctrl-val" id="growthVal">+20%</span></div>
+      <input type="range" min="-20" max="60" step="1" value="20" id="growth" oninput="update()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label"><span>Gross profit margin</span><span class="ctrl-val" id="marginVal">55%</span></div>
+      <input type="range" min="20" max="85" step="1" value="55" id="margin" oninput="update()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label"><span>GP multiple (NTM)</span><span class="ctrl-val" id="multipleVal">6.0x</span></div>
+      <input type="range" min="0" max="150" step="1" value="60" id="multipleSlider" oninput="update()">
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric highlight">
+      <div class="metric-label">Exit valuation</div>
+      <div class="metric-value" id="exitVal">—</div>
+      <div class="metric-sub">Yr(n+1) GP × multiple</div>
+    </div>
+    <div class="metric highlight">
+      <div class="metric-label">Our stake at exit</div>
+      <div class="metric-value" id="stakeVal">—</div>
+      <div class="metric-sub" id="stakeSubLabel">12.8% of exit</div>
+    </div>
+    <div class="metric" id="moicCard">
+      <div class="metric-label">MOIC</div>
+      <div class="metric-value" id="moicVal">—</div>
+      <div class="metric-sub" id="moicSub">on investment</div>
+    </div>
+    <div class="metric" id="irrCard">
+      <div class="metric-label">IRR</div>
+      <div class="metric-value" id="irrVal">—</div>
+      <div class="metric-sub" id="irrSub">5-year hold</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label" id="rev5Label">Yr5 revenue</div>
+      <div class="metric-value" id="rev5Val">—</div>
+      <div class="metric-sub" id="rev5Sub">—</div>
+    </div>
+  </div>
+
+  <div class="tab-row">
+    <button class="tab active" id="tab-growth" onclick="switchTab('growth')">Revenue & GP</button>
+    <button class="tab" id="tab-bridge" onclick="switchTab('bridge')">Valuation bridge</button>
+    <button class="tab" id="tab-heat" onclick="switchTab('heat')">IRR sensitivity</button>
+  </div>
+
+  <div id="legend-growth" class="legend">
+    <span><span class="ldot" style="background:#185FA5;"></span>revenue</span>
+    <span><span class="ldot" style="background:#5DCAA5;"></span>gross profit</span>
+  </div>
+  <div id="legend-bridge" class="legend" style="display:none;">
+    <span><span class="ldot" style="background:#B5D4F4;"></span>entry valuation (implied)</span>
+    <span><span class="ldot" style="background:#185FA5;"></span>exit valuation</span>
+    <span><span class="ldot" style="background:#5DCAA5;"></span>our proceeds</span>
+  </div>
+  <div id="legend-heat" class="legend" style="display:none;">
+    <span style="font-size:12px;color:var(--text2);">IRR % — rows: growth rate · cols: GP multiple · margin fixed at slider value</span>
+  </div>
+
+  <div class="chart-wrap" id="chartWrap">
+    <canvas id="mainChart"></canvas>
+  </div>
+  <div id="heatWrap" style="display:none;"></div>
+
+  <div class="notes">
+    <span id="note1">—</span>
+    <span id="note2">—</span>
+  </div>
+
+</div>
+
+<script>
+let mainChart;
+let currentTab = 'growth';
+
+const DEFAULTS = {
+  companyName: 'Portfolio Co.',
+  y0rev: 136,
+  investment: 100,
+  stake: 12.8,
+  holdYears: 5,
+  growth: 20,
+  margin: 55,
+  multiple: 60
+};
+
+function resetAssumptions() {
+  document.getElementById('companyName').value = DEFAULTS.companyName;
+  document.getElementById('y0rev').value = DEFAULTS.y0rev;
+  document.getElementById('investment').value = DEFAULTS.investment;
+  document.getElementById('stake').value = DEFAULTS.stake;
+  document.getElementById('holdYears').value = DEFAULTS.holdYears;
+  document.getElementById('growth').value = DEFAULTS.growth;
+  document.getElementById('margin').value = DEFAULTS.margin;
+  document.getElementById('multipleSlider').value = DEFAULTS.multiple;
+  update();
+}
+
+function getAssumptions() {
+  return {
+    y0rev: parseFloat(document.getElementById('y0rev').value) || 136,
+    revUnit: parseFloat(document.getElementById('revUnit').value) || 1,
+    investment: parseFloat(document.getElementById('investment').value) || 100,
+    stake: parseFloat(document.getElementById('stake').value) / 100 || 0.128,
+    holdYears: parseInt(document.getElementById('holdYears').value) || 5,
+    g: parseFloat(document.getElementById('growth').value) / 100,
+    m: parseFloat(document.getElementById('margin').value) / 100,
+    mult: parseFloat(document.getElementById('multipleSlider').value) / 10,
+  };
+}
+
+function fmtRev(n, unit) {
+  if (unit === 1000) {
+    if (Math.abs(n) >= 1000) return '$' + (n/1000).toFixed(2) + 'T';
+    return '$' + n.toFixed(1) + 'B';
+  }
+  if (Math.abs(n) >= 1000) return '$' + (n/1000).toFixed(2) + 'B';
+  return '$' + Math.round(n) + 'M';
+}
+
+function fmtVal(n) {
+  if (Math.abs(n) >= 1000) return '$' + (n/1000).toFixed(1) + 'B';
+  if (Math.abs(n) >= 10) return '$' + Math.round(n) + 'M';
+  return '$' + n.toFixed(1) + 'M';
+}
+
+function buildRevenues(y0, g, years) {
+  const revs = [y0];
+  for (let y = 1; y <= years + 1; y++) revs.push(revs[y-1] * (1 + g));
+  return revs;
+}
+
+function calcIRR(invest, proceeds, years) {
+  if (proceeds <= 0) return -1;
+  return Math.pow(proceeds / invest, 1 / years) - 1;
+}
+
+function getHeatColor(irr) {
+  if (irr >= 0.30) return { bg: '#639922', text: '#173404' };
+  if (irr >= 0.20) return { bg: '#97C459', text: '#27500A' };
+  if (irr >= 0.12) return { bg: '#C0DD97', text: '#3B6D11' };
+  if (irr >= 0.05) return { bg: '#F1EFE8', text: '#5F5E5A' };
+  if (irr >= 0)    return { bg: '#FAC775', text: '#633806' };
+  return { bg: '#F09595', text: '#791F1F' };
+}
+
+function update() {
+  const { y0rev, revUnit, investment, stake, holdYears, g, m, mult } = getAssumptions();
+  const companyName = document.getElementById('companyName').value || 'Portfolio Co.';
+
+  document.getElementById('growthVal').textContent = (g >= 0 ? '+' : '') + Math.round(g * 100) + '%';
+  document.getElementById('marginVal').textContent = Math.round(m * 100) + '%';
+  document.getElementById('multipleVal').textContent = mult.toFixed(1) + 'x';
+  document.getElementById('stakeSubLabel').textContent = (stake * 100).toFixed(1) + '% of exit';
+  document.getElementById('irrSub').textContent = holdYears + '-year hold';
+  document.getElementById('moicSub').textContent = 'on $' + Math.round(investment) + 'M invested';
+
+  const revs = buildRevenues(y0rev, g, holdYears);
+  const gps = revs.map(r => r * m);
+
+  const ntmGP = gps[holdYears + 1];
+  const exitVal = ntmGP * mult;
+  const entryImplied = investment / stake;
+  const ourProceeds = exitVal * stake;
+  const moic = ourProceeds / investment;
+  const irr = calcIRR(investment, ourProceeds, holdYears);
+
+  document.getElementById('exitVal').textContent = fmtVal(exitVal);
+  document.getElementById('stakeVal').textContent = fmtVal(ourProceeds);
+  document.getElementById('moicVal').textContent = moic.toFixed(2) + 'x';
+
+  const irrPct = irr < -0.5 ? 'N/M' : (irr * 100).toFixed(1) + '%';
+  document.getElementById('irrVal').textContent = irrPct;
+
+  document.getElementById('irrCard').className = 'metric' + (irr >= 0.20 ? ' good' : irr >= 0.05 ? '' : ' warn');
+  document.getElementById('moicCard').className = 'metric' + (moic >= 2 ? ' good' : moic >= 1 ? '' : ' warn');
+
+  const holdLabel = 'Yr' + holdYears;
+  document.getElementById('rev5Label').textContent = holdLabel + ' revenue';
+  document.getElementById('rev5Val').textContent = fmtVal(revs[holdYears]);
+  document.getElementById('rev5Sub').textContent = 'Yr' + (holdYears + 1) + ' GP: ' + fmtVal(gps[holdYears + 1]);
+
+  document.getElementById('note1').textContent =
+    'Entry implied valuation: ' + fmtVal(entryImplied) + ' ($' + Math.round(investment) + 'M for ' + (stake*100).toFixed(1) + '%)';
+  document.getElementById('note2').textContent =
+    'Value creation: ' + fmtVal(exitVal - entryImplied) + ' (' + ((exitVal / entryImplied - 1) * 100).toFixed(0) + '% valuation uplift)';
+
+  if (currentTab === 'growth') drawGrowth(revs, gps, holdYears, revUnit);
+  else if (currentTab === 'bridge') drawBridge(entryImplied, exitVal, ourProceeds);
+  else drawHeat();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  ['growth', 'bridge', 'heat'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    const lg = document.getElementById('legend-' + t);
+    if (lg) lg.style.display = t === tab ? 'flex' : 'none';
+  });
+  document.getElementById('chartWrap').style.display = tab === 'heat' ? 'none' : 'block';
+  document.getElementById('heatWrap').style.display = tab === 'heat' ? 'block' : 'none';
+  update();
+}
+
+function drawGrowth(revs, gps, holdYears, revUnit) {
+  if (mainChart) mainChart.destroy();
+  const labels = Array.from({ length: holdYears + 1 }, (_, i) => i === 0 ? 'Y0' : 'Y' + i);
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mainChart = new Chart(document.getElementById('mainChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Revenue',
+          data: revs.slice(0, holdYears + 1).map(v => Math.round(v)),
+          backgroundColor: isDark ? '#378ADD' : '#185FA5',
+          borderRadius: 3, borderSkipped: false
+        },
+        {
+          label: 'Gross profit',
+          data: gps.slice(0, holdYears + 1).map(v => Math.round(v)),
+          backgroundColor: isDark ? '#1D9E75' : '#5DCAA5',
+          borderRadius: 3, borderSkipped: false
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtVal(ctx.parsed.y) } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#888780' }, border: { display: false } },
+        y: { grid: { color: 'rgba(136,135,128,0.15)' }, ticks: { callback: v => fmtVal(v), font: { size: 11 }, color: '#888780', maxTicksLimit: 5 }, border: { display: false } }
+      }
+    }
+  });
+}
+
+function drawBridge(entry, exit, proceeds) {
+  if (mainChart) mainChart.destroy();
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const labels = ['Entry valuation\n(implied)', 'Exit valuation\n(NTM GP × mult)', 'Our proceeds\n(stake at exit)'];
+  const vals = [Math.round(entry), Math.round(exit), Math.round(proceeds)];
+  const colors = isDark
+    ? ['#0C447C', '#378ADD', '#1D9E75']
+    : ['#B5D4F4', '#185FA5', '#5DCAA5'];
+  mainChart = new Chart(document.getElementById('mainChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: vals, backgroundColor: colors, borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fmtVal(ctx.parsed.y) } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#888780' }, border: { display: false } },
+        y: { grid: { color: 'rgba(136,135,128,0.15)' }, ticks: { callback: v => fmtVal(v), font: { size: 11 }, color: '#888780', maxTicksLimit: 5 }, border: { display: false } }
+      }
+    }
+  });
+}
+
+function drawHeat() {
+  const { y0rev, investment, stake, holdYears, m } = getAssumptions();
+  const growthRates = [0.40, 0.30, 0.20, 0.10, 0.0, -0.10, -0.20];
+  const multiples = [2, 4, 6, 8, 10, 12, 15];
+  const wrap = document.getElementById('heatWrap');
+
+  let html = '<div style="display:grid;grid-template-columns:60px ' + multiples.map(() => '1fr').join(' ') + ';gap:2px;">';
+  html += '<div class="heatmap-axis" style="font-size:10px;">growth \\ mult</div>';
+  multiples.forEach(mt => {
+    html += '<div class="heatmap-axis">' + mt + 'x</div>';
+  });
+
+  growthRates.forEach(g => {
+    const revs = buildRevenues(y0rev, g, holdYears);
+    const gps = revs.map(r => r * m);
+    const ntmGP = gps[holdYears + 1];
+    html += '<div class="heatmap-axis">' + (g >= 0 ? '+' : '') + Math.round(g * 100) + '%</div>';
+    multiples.forEach(mt => {
+      const exitVal = ntmGP * mt;
+      const proceeds = exitVal * stake;
+      const irr = calcIRR(investment, proceeds, holdYears);
+      const c = getHeatColor(irr);
+      const label = irr < -0.5 ? 'N/M' : (irr * 100).toFixed(0) + '%';
+      html += '<div class="heatmap-cell" style="background:' + c.bg + ';color:' + c.text + ';">' + label + '</div>';
+    });
+  });
+
+  html += '</div>';
+  html += '<div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;font-size:11px;color:var(--text2);">';
+  [
+    { bg: '#639922', text: '#173404', label: '≥ 30% IRR' },
+    { bg: '#97C459', text: '#27500A', label: '20–30%' },
+    { bg: '#C0DD97', text: '#3B6D11', label: '12–20%' },
+    { bg: '#F1EFE8', text: '#5F5E5A', label: '5–12%' },
+    { bg: '#FAC775', text: '#633806', label: '0–5%' },
+    { bg: '#F09595', text: '#791F1F', label: '< 0%' },
+  ].forEach(l => {
+    html += '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:' + l.bg + ';"></span>' + l.label + '</span>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+update();
+</script>
+</body>
+</html>
